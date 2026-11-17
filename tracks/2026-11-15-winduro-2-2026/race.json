@@ -23,6 +23,19 @@
       "discipline": "Windfoil",
       "color": "#ffcb5b",
       "gear": "Fanatic Beeeee"
+    },
+    {
+      "name": "Stewart M.",
+      "file": "stewart_winduro2.gpx",
+      "discipline": "Windsurf",
+      "color": "#ff7297",
+      "gear": "Windsurfer LT"
+    },
+    {
+      "name": "James K",
+      "file": "james_winduro2.gpx",
+      "discipline": "Windsurf",
+      "color": "#9d8aff"
     }
   ]
 }
