@@ -135,8 +135,8 @@ def validate_manifest(manifest_path, race_name, errors):
         return 0
 
     entries = manifest.get("tracks") if isinstance(manifest, dict) else None
-    if not isinstance(entries, list) or not entries:
-        errors.append(f"{race_name}: manifest must contain a non-empty tracks array.")
+    if not isinstance(entries, list):
+        errors.append(f"{race_name}: manifest must contain a tracks array.")
         return 0
 
     sync_line = manifest.get("syncLine")
@@ -284,6 +284,14 @@ def validate():
             errors.append(f"{race_id}: name must be a non-empty string in races.json.")
             race_name = race_id
 
+        race_date = race.get("date")
+        try:
+            parsed_race_date = datetime.strptime(race_date, "%Y-%m-%d") if isinstance(race_date, str) else None
+        except ValueError:
+            parsed_race_date = None
+        if parsed_race_date is None or parsed_race_date.strftime("%Y-%m-%d") != race_date:
+            errors.append(f"{race_id}: date must be a valid YYYY-MM-DD date in races.json.")
+
         manifest_value = race.get("manifest")
         if (
             not isinstance(manifest_value, str)
@@ -301,6 +309,10 @@ def validate():
         manifest_path = (ROOT / relative_manifest).resolve()
         if not manifest_path.is_relative_to(ROOT.resolve()):
             errors.append(f"{race_id}: manifest must stay inside the repository.")
+            continue
+        expected_manifest_path = (ROOT / "tracks" / race_id / "race.json").resolve()
+        if manifest_path != expected_manifest_path:
+            errors.append(f"{race_id}: manifest must be tracks/{race_id}/race.json.")
             continue
         if manifest_path in manifest_paths:
             errors.append(f"{race_id}: each race must have its own manifest.")

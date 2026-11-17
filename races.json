@@ -1,9 +1,10 @@
 {
   "races": [
     {
-      "id": "lake-union-2026",
-      "name": "Lake Union — November 2026",
-      "manifest": "./tracks/tracks.json"
+      "id": "winduro-2026",
+      "name": "Winduro 2026",
+      "date": "2026-11-08",
+      "manifest": "./tracks/winduro-2026/race.json"
     }
   ]
 }

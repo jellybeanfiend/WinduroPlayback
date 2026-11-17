@@ -651,3 +651,275 @@ button:disabled {
     border-left: 0;
   }
 }
+
+.manager-page {
+  min-width: 320px;
+  background: #10191e;
+}
+
+.manager {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 28px 22px 40px;
+}
+
+.manager-header,
+.folder-panel,
+.manager-section-heading,
+.managed-track,
+.manager-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.manager-header {
+  margin-bottom: 20px;
+}
+
+.manager-header h1 {
+  margin: 6px 0;
+}
+
+.manager-header .subheading {
+  max-width: 650px;
+}
+
+.manager-viewer-link {
+  color: #8edfc1;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.manager-panel {
+  padding: 18px;
+  border: 1px solid #2a3a3f;
+  border-radius: 12px;
+  background: #18252a;
+}
+
+.folder-panel {
+  margin-bottom: 12px;
+}
+
+.folder-panel h2,
+.manager-panel h2 {
+  margin-bottom: 5px;
+}
+
+.folder-panel .hint {
+  margin: 0 0 5px;
+}
+
+.manager-repository {
+  color: #8edfc1;
+  font-size: 0.76rem;
+}
+
+.manager-status {
+  min-height: 1.4em;
+  margin: 8px 2px 18px;
+  color: #a9b8ba;
+  font-size: 0.82rem;
+}
+
+.manager-status[data-kind="success"] {
+  color: #8edfc1;
+}
+
+.manager-status[data-kind="error"] {
+  color: #ffb1a9;
+}
+
+.manager-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  align-items: start;
+  gap: 16px;
+}
+
+.manager-grid[hidden],
+.manager-form[hidden],
+.manager-actions [hidden] {
+  display: none;
+}
+
+.manager-section-heading {
+  margin-bottom: 14px;
+}
+
+.manager-section-heading .hint {
+  margin: 4px 0 0;
+}
+
+.manager-field {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0;
+  color: #dbe5e3;
+  font-size: 0.78rem;
+}
+
+.manager-field input,
+.manager-field select {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid #43565b;
+  border-radius: 6px;
+  background: #121d22;
+  color: #eef4f3;
+}
+
+.manager-field input[type="file"] {
+  min-height: 0;
+  padding: 7px;
+}
+
+.manager-field input[type="color"] {
+  width: 74px;
+  min-height: 42px;
+  padding: 4px;
+}
+
+.manager-field input[readonly] {
+  color: #a9b8ba;
+}
+
+.manager-field small {
+  color: #a9b8ba;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.manager-form {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #34474c;
+  border-radius: 9px;
+  background: #142126;
+}
+
+.manager-form h3 {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+}
+
+.manager-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.manager-actions button,
+.manager-section-heading > button,
+.folder-panel > button {
+  min-width: 0;
+}
+
+button.danger {
+  border: 1px solid #9a514d;
+  background: #4a2828;
+  color: #ffd9d4;
+}
+
+.track-heading {
+  margin-top: 24px;
+}
+
+.managed-tracks {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.managed-track {
+  padding: 10px;
+  border: 1px solid #2c3b40;
+  border-radius: 8px;
+  background: #142126;
+}
+
+.managed-track-description {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.managed-track-description strong {
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+}
+
+.managed-track-description span {
+  overflow-wrap: anywhere;
+  color: #a9b8ba;
+  font-size: 0.7rem;
+}
+
+.compact-actions {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.compact-actions button {
+  padding: 5px 8px;
+  font-size: 0.68rem;
+}
+
+.managed-track-empty {
+  padding: 14px 10px;
+  color: #a9b8ba;
+  font-size: 0.78rem;
+}
+
+.manager-advanced {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #2c3b40;
+}
+
+.manager-advanced summary {
+  color: #dbe5e3;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.manager-help ul {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding-left: 18px;
+  color: #a9b8ba;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.manager-help code {
+  color: #dbe5e3;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .manager {
+    padding: 18px 14px 30px;
+  }
+
+  .manager-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .manager-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .folder-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

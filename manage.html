@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark light">
+    <title>Manage races · Winduro</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body class="manager-page">
+    <main class="manager">
+      <header class="manager-header">
+        <div>
+          <p class="eyebrow">WINDURO · LOCAL TOOL</p>
+          <h1>Race and track manager</h1>
+          <p class="subheading">Edit race data in your local checkout. Changes are saved to files; Git commits remain manual.</p>
+        </div>
+        <a class="manager-viewer-link" href="./index.html">Open race playback</a>
+      </header>
+
+      <section class="manager-panel folder-panel" aria-labelledby="folder-heading">
+        <div>
+          <h2 id="folder-heading">Repository folder</h2>
+          <p class="hint">Use Chrome or Edge on localhost. Choose the WinduroPlayback project folder and grant read/write access.</p>
+          <output id="repository-name" class="manager-repository">No folder selected</output>
+        </div>
+        <button id="open-repository" type="button">Open repository folder</button>
+      </section>
+
+      <p id="manager-status" class="manager-status" role="status" aria-live="polite">
+        Select the project folder to begin.
+      </p>
+
+      <section id="editor" class="manager-grid" hidden>
+        <section class="manager-panel" aria-labelledby="race-heading">
+          <div class="manager-section-heading">
+            <div>
+              <h2 id="race-heading">Races</h2>
+              <p class="hint">Each race has a stable generated ID and its own track folder.</p>
+            </div>
+            <button id="new-race" class="secondary" type="button">Add race</button>
+          </div>
+
+          <label class="manager-field" for="race-select">
+            <span>Current race</span>
+            <select id="race-select"></select>
+          </label>
+
+          <form id="race-form" class="manager-form" hidden>
+            <label class="manager-field" for="race-name">
+              <span>Race name</span>
+              <input id="race-name" type="text" maxlength="100" required>
+            </label>
+            <label class="manager-field" for="race-date">
+              <span>Race date</span>
+              <input id="race-date" type="date" required>
+            </label>
+            <label class="manager-field" for="race-id">
+              <span>Race ID</span>
+              <input id="race-id" type="text" readonly>
+              <small>Generated when creating a race. It stays fixed if the name or date is edited.</small>
+            </label>
+            <p id="sync-line-note" class="hint" hidden>
+              The current race’s sync line will be copied as a placeholder. Adjust it in the new <code>race.json</code> before using a different course.
+            </p>
+            <div class="manager-actions">
+              <button id="save-race" type="submit">Save race</button>
+              <button id="cancel-race" class="secondary" type="button">Cancel</button>
+              <button id="delete-race" class="danger" type="button">Remove race</button>
+            </div>
+          </form>
+
+          <div class="manager-section-heading track-heading">
+            <div>
+              <h2>Participants</h2>
+              <p class="hint">Removing a participant removes its metadata, not its GPX file.</p>
+            </div>
+            <button id="new-track" class="secondary" type="button">Add GPX track</button>
+          </div>
+          <ul id="managed-tracks" class="managed-tracks"></ul>
+
+          <form id="track-form" class="manager-form" hidden>
+            <h3 id="track-form-heading">Add GPX track</h3>
+            <label class="manager-field" for="track-name">
+              <span>Participant name</span>
+              <input id="track-name" type="text" maxlength="100" required>
+            </label>
+            <label class="manager-field" for="track-discipline">
+              <span>Discipline</span>
+              <select id="track-discipline" required>
+                <option value="Windsurf">Windsurf</option>
+                <option value="Windfoil">Windfoil</option>
+                <option value="Wingfoil">Wingfoil</option>
+                <option value="Formula">Formula</option>
+              </select>
+            </label>
+            <label class="manager-field" for="track-gear">
+              <span>Gear</span>
+              <input id="track-gear" type="text" maxlength="240">
+            </label>
+            <label class="manager-field color-field" for="track-color">
+              <span>Track color</span>
+              <input id="track-color" type="color" required>
+            </label>
+            <label class="manager-field" for="track-gpx">
+              <span>GPX file</span>
+              <input id="track-gpx" type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml">
+              <small id="current-gpx">Choose a GPX file to copy into this race’s folder.</small>
+            </label>
+            <details class="manager-advanced">
+              <summary>Optional timing metadata</summary>
+              <p class="hint">Only needed for GPX files without timestamps on every point. Times use your local timezone and are saved as ISO timestamps.</p>
+              <label class="manager-field" for="timing-start">
+                <span>Recording start</span>
+                <input id="timing-start" type="datetime-local" step="any">
+              </label>
+              <label class="manager-field" for="timing-duration">
+                <span>Recording duration (seconds)</span>
+                <input id="timing-duration" type="number" min="1" step="any">
+              </label>
+              <label class="manager-field" for="track-start-time">
+                <span>Optional sync start override</span>
+                <input id="track-start-time" type="datetime-local" step="any">
+              </label>
+            </details>
+            <div class="manager-actions">
+              <button id="save-track" type="submit">Save track</button>
+              <button id="cancel-track" class="secondary" type="button">Cancel</button>
+            </div>
+          </form>
+        </section>
+
+        <aside class="manager-panel manager-help">
+          <h2>Local editing</h2>
+          <ul>
+            <li>Files are written only after selecting the project folder and granting permission.</li>
+            <li>GPX files are copied to <code>tracks/&lt;race-id&gt;/</code>. Existing files are not removed when metadata is removed.</li>
+            <li>New races inherit the currently selected race’s sync line as a placeholder.</li>
+            <li>Run <code>python scripts/validate_tracks.py</code> before committing changes.</li>
+            <li>This editor does not commit or push changes.</li>
+          </ul>
+        </aside>
+      </section>
+    </main>
+    <script src="./track-colors.js"></script>
+    <script src="./manage.js"></script>
+  </body>
+</html>

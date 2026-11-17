@@ -1,26 +1,5 @@
 const RACE_CATALOG_URL = new URL("./races.json", document.baseURI);
-const TRACK_COLORS = [
-  "#59d5ff",
-  "#ffcb5b",
-  "#ff7297",
-  "#9d8aff",
-  "#7ee089",
-  "#ff9864",
-  "#f500f5",
-  "#00f500",
-  "#f53100",
-  "#b4da1b",
-  "#f500a3",
-  "#1bdac7",
-  "#009bf5",
-  "#ff2954",
-  "#ed6eed",
-  "#00f572",
-  "#9d5cff",
-  "#f58b00",
-  "#f5d400",
-  "#6eda1b",
-];
+const TRACK_COLORS = window.WINDURO_TRACK_COLORS;
 
 // The Formula Discipline will be included in the Windsurf filter.
 // I'm adding special internal handling so Troy feels special
@@ -273,10 +252,14 @@ async function loadRaceCatalog() {
       !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(race.id) ||
       typeof race.name !== "string" ||
       !race.name.trim() ||
+      typeof race.date !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(race.date) ||
+      !Number.isFinite(Date.parse(`${race.date}T00:00:00Z`)) ||
+      new Date(`${race.date}T00:00:00Z`).toISOString().slice(0, 10) !== race.date ||
       typeof race.manifest !== "string" ||
       !race.manifest.trim()
     ) {
-      throw new Error(`Race ${index + 1} in races.json needs a valid id, name, and manifest.`);
+      throw new Error(`Race ${index + 1} in races.json needs a valid id, name, date, and manifest.`);
     }
     if (ids.has(race.id)) throw new Error(`Race IDs must be unique; check ${race.id} in races.json.`);
     ids.add(race.id);
@@ -284,7 +267,7 @@ async function loadRaceCatalog() {
     if (manifestUrl.origin !== RACE_CATALOG_URL.origin) {
       throw new Error(`${race.id} manifest must be hosted with this race catalog.`);
     }
-    return { id: race.id, name: race.name.trim(), manifestUrl };
+    return { id: race.id, name: race.name.trim(), date: race.date, manifestUrl };
   });
 
   const requestedRaceId = new URLSearchParams(window.location.search).get("race");
@@ -295,7 +278,7 @@ async function loadRaceCatalog() {
     ...races.map((race) => {
       const option = document.createElement("option");
       option.value = race.id;
-      option.textContent = race.name;
+      option.textContent = `${race.name} · ${race.date}`;
       return option;
     }),
   );
@@ -314,8 +297,8 @@ async function loadTrackManifest() {
   if (!response.ok) throw new Error(`Could not load ${activeRace.name} manifest (${response.status} ${response.statusText}).`);
 
   const manifest = await response.json();
-  if (!manifest || !Array.isArray(manifest.tracks) || manifest.tracks.length === 0) {
-    throw new Error(`${activeRace.name} manifest must contain a non-empty tracks array.`);
+  if (!manifest || !Array.isArray(manifest.tracks)) {
+    throw new Error(`${activeRace.name} manifest must contain a tracks array.`);
   }
   if (!manifest.syncLine) {
     throw new Error(`${activeRace.name} manifest must define a two-point syncLine.`);
@@ -1309,6 +1292,14 @@ function setLeaderboardCollapsed(collapsed) {
 }
 
 function updateLeaderboard(positionStates) {
+  if (tracks.length === 0) {
+    ui.leaderboard.hidden = true;
+    ui.leaderboardList.replaceChildren();
+    ui.leaderboardEmpty.hidden = true;
+    lastLeaderboardSignature = null;
+    return;
+  }
+
   const entries = positionStates
     .map(({ track, state }) => {
       const finishTime =
@@ -1440,7 +1431,9 @@ function refreshTimeline(resetPosition = false) {
     ui.clock.textContent = "--:--:--";
     ui.elapsed.textContent = "00:00:00";
     ui.status.textContent =
-      visibleTracks.length === 0
+      tracks.length === 0
+        ? "This race has no participant tracks yet."
+        : visibleTracks.length === 0
         ? "Select at least one participant to enable playback."
         : visibleTracks.some((track) => track.error)
           ? "One or more selected tracks could not be loaded. See participant details."
@@ -1731,7 +1724,7 @@ async function initialize() {
     }
     for (const track of tracks) calculateTrackCompletion(track, defaultSyncLine);
     sortParticipantList();
-    ui.toggleTrackDetails.disabled = false;
+    ui.toggleTrackDetails.disabled = definitions.length === 0;
     if (shareState.participantNames) {
       for (const track of tracks) {
         track.visible = shareState.participantNames.has(track.name);
