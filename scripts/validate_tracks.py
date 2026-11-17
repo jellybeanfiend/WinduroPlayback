@@ -8,9 +8,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TRACKS_DIR = ROOT / "tracks"
-MANIFEST_PATH = TRACKS_DIR / "tracks.json"
+RACE_CATALOG_PATH = ROOT / "races.json"
 COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
+RACE_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DISCIPLINES = {"Windsurf", "Windfoil", "Wingfoil", "Formula"}
 EARTH_RADIUS_METERS = 6_371_000
 
@@ -54,16 +54,16 @@ def distance_meters(first, second):
     return EARTH_RADIUS_METERS * 2 * math.atan2(math.sqrt(haversine), math.sqrt(1 - haversine))
 
 
-def validate_track_file(track, label, timing, has_timing_metadata, start_time, errors):
+def validate_track_file(track, label, track_directory, timing, has_timing_metadata, start_time, errors):
     filename = track.get("file")
     if not isinstance(filename, str) or not filename.lower().endswith(".gpx"):
         errors.append(f"{label}: file must be a GPX filename.")
         return
     if Path(filename).name != filename or "/" in filename or "\\" in filename:
-        errors.append(f"{label}: file must be a filename inside tracks/, not a path.")
+        errors.append(f"{label}: file must be a filename beside its race manifest, not a path.")
         return
 
-    path = TRACKS_DIR / filename
+    path = track_directory / filename
     if not path.is_file():
         errors.append(f"{label}: {filename} does not exist.")
         return
@@ -116,32 +116,32 @@ def validate_track_file(track, label, timing, has_timing_metadata, start_time, e
         if start_time is not None and not timestamps[0] <= start_time <= timestamps[-1]:
             errors.append(f"{label}: startTime must fall within the GPX timestamp range: {timestamps[0]} to {timestamps[-1]}.")
     elif timed_count == 0:
+        if not has_timing_metadata:
+            errors.append(f"{label}: {filename} has no point timestamps and needs timing.start and timing.durationSeconds.")
+            return
         recording_start_time = parse_iso_datetime(timing.get("start"))
         if start_time is not None:
             if start_time < recording_start_time:
                 errors.append(f"{label}: startTime override given is before the recording timing.start.")
             if start_time >= recording_start_time + timedelta(seconds=timing.get("durationSeconds")):
                 errors.append(f"{label}: startTime override given is not within the timing.duration.")
-        if not has_timing_metadata:
-            errors.append(f"{label}: {filename} has no point timestamps and needs timing.start and timing.durationSeconds.")
 
 
-def validate():
-    errors = []
+def validate_manifest(manifest_path, race_name, errors):
     try:
-        manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        print(f"Track-data validation failed: cannot read {MANIFEST_PATH}: {error}")
-        return 1
+        errors.append(f"{race_name}: cannot read {manifest_path.relative_to(ROOT)}: {error}")
+        return 0
 
     entries = manifest.get("tracks") if isinstance(manifest, dict) else None
     if not isinstance(entries, list) or not entries:
-        print("Track-data validation failed: tracks/tracks.json must contain a non-empty tracks array.")
-        return 1
+        errors.append(f"{race_name}: manifest must contain a non-empty tracks array.")
+        return 0
 
     sync_line = manifest.get("syncLine")
     if not isinstance(sync_line, dict):
-        errors.append("syncLine must define start and end points.")
+        errors.append(f"{race_name}: syncLine must define start and end points.")
     else:
         endpoints = []
         for endpoint in ("start", "end"):
@@ -153,30 +153,31 @@ def validate():
                 or not -90 <= value[0] <= 90
                 or not -180 <= value[1] <= 180
             ):
-                errors.append(f"syncLine.{endpoint} must be [latitude, longitude] within valid bounds.")
+                errors.append(f"{race_name}: syncLine.{endpoint} must be [latitude, longitude] within valid bounds.")
                 endpoints.append(None)
             else:
                 endpoints.append((value[0], value[1]))
         if all(endpoint is not None for endpoint in endpoints) and distance_meters(*endpoints) < 1:
-            errors.append("syncLine endpoints must be at least one meter apart.")
+            errors.append(f"{race_name}: syncLine endpoints must be at least one meter apart.")
 
     names = set()
     filenames = set()
     colors = set()
     for index, track in enumerate(entries, start=1):
         if not isinstance(track, dict):
-            errors.append(f"Track {index} must be an object.")
+            errors.append(f"{race_name}: Track {index} must be an object.")
             continue
 
+        track_error_count = len(errors)
         name = track.get("name")
         if not isinstance(name, str) or not name.strip():
-            label = f"Track {index}"
+            label = f"{race_name} / Track {index}"
             errors.append(f"{label}: name must be a non-empty string.")
         else:
-            label = name.strip()
+            label = f"{race_name} / {name.strip()}"
             name_key = label.casefold()
             if name_key in names:
-                errors.append(f"{label}: participant names must be unique.")
+                errors.append(f"{label}: participant names must be unique within the race.")
             names.add(name_key)
 
         discipline = track.get("discipline")
@@ -187,7 +188,7 @@ def validate():
         if isinstance(filename, str):
             file_key = filename.casefold()
             if file_key in filenames:
-                errors.append(f"{label}: GPX filenames must be unique.")
+                errors.append(f"{label}: GPX filenames must be unique within the race.")
             filenames.add(file_key)
 
         color = track.get("color")
@@ -243,8 +244,69 @@ def validate():
                 ):
                     errors.append(f"{label}: timing.durationSeconds must be a positive number.")
 
-        if not errors:
-            validate_track_file(track, label, timing, has_timing_metadata, start_time, errors)
+        if len(errors) == track_error_count:
+            validate_track_file(track, label, manifest_path.parent, timing, has_timing_metadata, start_time, errors)
+
+    return len(entries)
+
+
+def validate():
+    errors = []
+    try:
+        catalog = json.loads(RACE_CATALOG_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"Track-data validation failed: cannot read {RACE_CATALOG_PATH}: {error}")
+        return 1
+
+    races = catalog.get("races") if isinstance(catalog, dict) else None
+    if not isinstance(races, list) or not races:
+        print("Track-data validation failed: races.json must contain a non-empty races array.")
+        return 1
+
+    race_ids = set()
+    manifest_paths = set()
+    participant_count = 0
+    for index, race in enumerate(races, start=1):
+        if not isinstance(race, dict):
+            errors.append(f"Race {index} in races.json must be an object.")
+            continue
+
+        race_id = race.get("id")
+        if not isinstance(race_id, str) or not RACE_ID_PATTERN.fullmatch(race_id):
+            errors.append(f"Race {index} in races.json needs an id using lowercase letters, numbers, and hyphens.")
+            race_id = f"Race {index}"
+        elif race_id in race_ids:
+            errors.append(f"{race_id}: race IDs must be unique.")
+        race_ids.add(race_id)
+
+        race_name = race.get("name")
+        if not isinstance(race_name, str) or not race_name.strip():
+            errors.append(f"{race_id}: name must be a non-empty string in races.json.")
+            race_name = race_id
+
+        manifest_value = race.get("manifest")
+        if (
+            not isinstance(manifest_value, str)
+            or not manifest_value.strip()
+            or "\\" in manifest_value
+            or "?" in manifest_value
+            or "#" in manifest_value
+        ):
+            errors.append(f"{race_id}: manifest must be a relative path in races.json.")
+            continue
+        relative_manifest = Path(manifest_value)
+        if relative_manifest.is_absolute() or ".." in relative_manifest.parts:
+            errors.append(f"{race_id}: manifest must stay inside the repository.")
+            continue
+        manifest_path = (ROOT / relative_manifest).resolve()
+        if not manifest_path.is_relative_to(ROOT.resolve()):
+            errors.append(f"{race_id}: manifest must stay inside the repository.")
+            continue
+        if manifest_path in manifest_paths:
+            errors.append(f"{race_id}: each race must have its own manifest.")
+            continue
+        manifest_paths.add(manifest_path)
+        participant_count += validate_manifest(manifest_path, race_name.strip(), errors)
 
     if errors:
         print("Track-data validation failed:")
@@ -252,7 +314,7 @@ def validate():
             print(f"- {error}")
         return 1
 
-    print(f"Validated {len(entries)} participants, manifest fields, sync line, colors, and GPX data.")
+    print(f"Validated {len(races)} race(s), {participant_count} participants, manifests, sync lines, colors, and GPX data.")
     return 0
 
 

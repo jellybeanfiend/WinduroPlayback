@@ -1,4 +1,4 @@
-const TRACK_MANIFEST_URL = new URL("./tracks/tracks.json", document.baseURI);
+const RACE_CATALOG_URL = new URL("./races.json", document.baseURI);
 const TRACK_COLORS = [
   "#59d5ff",
   "#ffcb5b",
@@ -52,6 +52,7 @@ L.tileLayer(TILE_URL, {
 const markerRenderer = L.svg({ pane: "markerPane" });
 
 const ui = {
+  raceSelect: document.querySelector("#race-select"),
   clock: document.querySelector("#clock"),
   elapsed: document.querySelector("#elapsed"),
   mode: document.querySelector("#time-mode"),
@@ -83,6 +84,8 @@ const ui = {
 
 const tracks = [];
 const DEFAULT_MODE = "relative";
+let activeRace = null;
+let activeManifestUrl = null;
 let mode = DEFAULT_MODE;
 let rangeStart = 0;
 let rangeEnd = 0;
@@ -253,16 +256,69 @@ function parseGpx(xmlText) {
   return { points, hasTimestamps: timestampCount === points.length };
 }
 
+async function loadRaceCatalog() {
+  const response = await fetch(RACE_CATALOG_URL);
+  if (!response.ok) throw new Error(`Could not load race catalog (${response.status} ${response.statusText}).`);
+
+  const catalog = await response.json();
+  if (!catalog || !Array.isArray(catalog.races) || catalog.races.length === 0) {
+    throw new Error("races.json must contain a non-empty races array.");
+  }
+
+  const ids = new Set();
+  const races = catalog.races.map((race, index) => {
+    if (
+      !race ||
+      typeof race.id !== "string" ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(race.id) ||
+      typeof race.name !== "string" ||
+      !race.name.trim() ||
+      typeof race.manifest !== "string" ||
+      !race.manifest.trim()
+    ) {
+      throw new Error(`Race ${index + 1} in races.json needs a valid id, name, and manifest.`);
+    }
+    if (ids.has(race.id)) throw new Error(`Race IDs must be unique; check ${race.id} in races.json.`);
+    ids.add(race.id);
+    const manifestUrl = new URL(race.manifest, RACE_CATALOG_URL);
+    if (manifestUrl.origin !== RACE_CATALOG_URL.origin) {
+      throw new Error(`${race.id} manifest must be hosted with this race catalog.`);
+    }
+    return { id: race.id, name: race.name.trim(), manifestUrl };
+  });
+
+  const requestedRaceId = new URLSearchParams(window.location.search).get("race");
+  const requestedRace = races.find((race) => race.id === requestedRaceId);
+  activeRace = requestedRace || races[0];
+  activeManifestUrl = activeRace.manifestUrl;
+  ui.raceSelect.replaceChildren(
+    ...races.map((race) => {
+      const option = document.createElement("option");
+      option.value = race.id;
+      option.textContent = race.name;
+      return option;
+    }),
+  );
+  ui.raceSelect.value = activeRace.id;
+  ui.raceSelect.disabled = false;
+
+  return {
+    invalidRace: requestedRaceId && !requestedRace
+      ? `Unknown race "${requestedRaceId}"; showing ${activeRace.name}.`
+      : "",
+  };
+}
+
 async function loadTrackManifest() {
-  const response = await fetch(TRACK_MANIFEST_URL);
-  if (!response.ok) throw new Error(`Could not load track manifest (${response.status} ${response.statusText}).`);
+  const response = await fetch(activeManifestUrl);
+  if (!response.ok) throw new Error(`Could not load ${activeRace.name} manifest (${response.status} ${response.statusText}).`);
 
   const manifest = await response.json();
   if (!manifest || !Array.isArray(manifest.tracks) || manifest.tracks.length === 0) {
-    throw new Error("tracks/tracks.json must contain a non-empty tracks array.");
+    throw new Error(`${activeRace.name} manifest must contain a non-empty tracks array.`);
   }
   if (!manifest.syncLine) {
-    throw new Error("tracks/tracks.json must define a two-point syncLine.");
+    throw new Error(`${activeRace.name} manifest must define a two-point syncLine.`);
   }
 
   const parseLinePoint = (value, label) => {
@@ -278,7 +334,7 @@ async function loadTrackManifest() {
       value[1] < -180 ||
       value[1] > 180
     ) {
-      throw new Error(`syncLine.${label} must be [latitude, longitude] in tracks/tracks.json.`);
+      throw new Error(`syncLine.${label} must be [latitude, longitude] in the ${activeRace.name} manifest.`);
     }
     return { lat: value[0], lon: value[1] };
   };
@@ -287,7 +343,7 @@ async function loadTrackManifest() {
     end: parseLinePoint(manifest.syncLine.end, "end"),
   };
   if (distanceMeters(parsedSyncLine.start, parsedSyncLine.end) < 1) {
-    throw new Error("The syncLine endpoints in tracks/tracks.json must be at least one meter apart.");
+    throw new Error(`The syncLine endpoints in the ${activeRace.name} manifest must be at least one meter apart.`);
   }
 
   const files = new Set();
@@ -295,7 +351,7 @@ async function loadTrackManifest() {
   const colors = new Set();
   const definitions = manifest.tracks.map((entry, index) => {
     if (!entry || typeof entry.name !== "string" || !entry.name.trim()) {
-      throw new Error(`Track ${index + 1} needs a non-empty name in tracks/tracks.json.`);
+      throw new Error(`Track ${index + 1} needs a non-empty name in the ${activeRace.name} manifest.`);
     }
     if (
       typeof entry.file !== "string" ||
@@ -303,37 +359,37 @@ async function loadTrackManifest() {
       entry.file.includes("/") ||
       entry.file.includes("\\")
     ) {
-      throw new Error(`Track ${entry.name} needs a GPX filename (not a path) in tracks/tracks.json.`);
+      throw new Error(`Track ${entry.name} needs a GPX filename (not a path) in the ${activeRace.name} manifest.`);
     }
     const fileKey = entry.file.toLowerCase();
     const nameKey = entry.name.trim().toLowerCase();
     if (files.has(fileKey) || names.has(nameKey)) {
-      throw new Error(`Track names and GPX filenames must be unique; check ${entry.name} in tracks/tracks.json.`);
+      throw new Error(`Track names and GPX filenames must be unique; check ${entry.name} in the ${activeRace.name} manifest.`);
     }
     files.add(fileKey);
     names.add(nameKey);
 
     const hasGear = entry.gear !== undefined && entry.gear !== null;
     if (hasGear && (typeof entry.gear !== "string" || !entry.gear.trim())) {
-      throw new Error(`${entry.name} gear must be a non-empty string in tracks/tracks.json.`);
+      throw new Error(`${entry.name} gear must be a non-empty string in the ${activeRace.name} manifest.`);
     }
     if (!DISCIPLINES.includes(entry.discipline)) {
       throw new Error(
-        `${entry.name} discipline must be Windsurf, Windfoil, or Wingfoil in tracks/tracks.json.`,
+        `${entry.name} discipline must be Windsurf, Windfoil, Wingfoil, or Formula in the ${activeRace.name} manifest.`,
       );
     }
 
     // Keep rendering resilient; CI separately requires explicit colors in the manifest.
     const hasColor = entry.color !== undefined && entry.color !== null;
     if (hasColor && (typeof entry.color !== "string" || !/^#[\da-f]{6}$/i.test(entry.color))) {
-      throw new Error(`${entry.name} color must be a six-digit hex color in tracks/tracks.json.`);
+      throw new Error(`${entry.name} color must be a six-digit hex color in the ${activeRace.name} manifest.`);
     }
     const color = (hasColor ? entry.color : TRACK_COLORS[index])?.toLowerCase();
     if (!color) {
       throw new Error(`Add a unique color to ${entry.name} or extend the track color palette in app.js.`);
     }
     if (colors.has(color)) {
-      throw new Error(`Track colors must be unique; check ${entry.name} in tracks/tracks.json.`);
+      throw new Error(`Track colors must be unique; check ${entry.name} in the ${activeRace.name} manifest.`);
     }
     colors.add(color);
     const hasSecondaryColor = entry.secondaryColor !== undefined && entry.secondaryColor !== null;
@@ -341,7 +397,7 @@ async function loadTrackManifest() {
       hasSecondaryColor &&
       (typeof entry.secondaryColor !== "string" || !/^#[\da-f]{6}$/i.test(entry.secondaryColor))
     ) {
-      throw new Error(`${entry.name} secondaryColor must be a six-digit hex color in tracks/tracks.json.`);
+      throw new Error(`${entry.name} secondaryColor must be a six-digit hex color in the ${activeRace.name} manifest.`);
     }
     const secondaryColor = hasSecondaryColor ? entry.secondaryColor.toLowerCase() : null;
     if (secondaryColor === color) {
@@ -549,6 +605,7 @@ function updateShareUrl() {
   const url = new URL(window.location.href);
   const params = url.searchParams;
 
+  params.set("race", activeRace.id);
   params.delete("mode");
   if (mode !== DEFAULT_MODE) params.set("mode", mode);
 
@@ -1086,7 +1143,7 @@ function setTrackTimes(track) {
     track.cardCompletion.title = "Completion duration unavailable";
     track.cardTimes.textContent = "Start and finish times unavailable";
     track.cardDetail.textContent =
-      `${track.points.length.toLocaleString()} points · missing timing.start and timing.durationSeconds in tracks/tracks.json`;
+      `${track.points.length.toLocaleString()} points · missing timing.start and timing.durationSeconds in the ${activeRace.name} manifest`;
   }
 }
 
@@ -1387,7 +1444,7 @@ function refreshTimeline(resetPosition = false) {
         ? "Select at least one participant to enable playback."
         : visibleTracks.some((track) => track.error)
           ? "One or more selected tracks could not be loaded. See participant details."
-          : "Add timing.start and timing.durationSeconds for untimed tracks in tracks/tracks.json to enable playback.";
+          : `Add timing.start and timing.durationSeconds for untimed tracks in the ${activeRace.name} manifest to enable playback.`;
     updateMap(true);
     return;
   }
@@ -1408,7 +1465,7 @@ function refreshTimeline(resetPosition = false) {
   ui.status.textContent = visibleTracks.some((track) => track.error)
     ? "One or more tracks could not be loaded. See participant details."
     : visibleTracks.some((track) => !track.timingReady)
-      ? "All routes are shown. Add timing.start and timing.durationSeconds in tracks/tracks.json to include untimed tracks in playback."
+      ? `All routes are shown. Add timing.start and timing.durationSeconds in the ${activeRace.name} manifest to include untimed tracks in playback.`
       : "";
   updateClock(true);
   updateMap(true);
@@ -1512,7 +1569,7 @@ async function loadTrack(definition) {
     keyboard: false,
   }).addTo(map);
   try {
-    const response = await fetch(new URL(definition.file, TRACK_MANIFEST_URL));
+    const response = await fetch(new URL(definition.file, activeManifestUrl));
     if (!response.ok) throw new Error(`Could not load GPX (${response.status} ${response.statusText}).`);
     const parsed = parseGpx(await response.text());
     track.name = definition.name;
@@ -1583,6 +1640,12 @@ function fitVisibleTracks() {
 }
 
 ui.play.addEventListener("click", startPause);
+ui.raceSelect.addEventListener("change", () => {
+  const url = new URL(window.location.href);
+  url.search = "";
+  url.searchParams.set("race", ui.raceSelect.value);
+  window.location.assign(url.href);
+});
 ui.drawSyncLine.addEventListener("click", toggleSyncLineDrawing);
 ui.disciplineFilters.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-discipline]");
@@ -1647,8 +1710,13 @@ ui.mode.addEventListener("change", () => {
 setSpeedLabel();
 async function initialize() {
   try {
+    const catalogState = await loadRaceCatalog();
+    ui.status.textContent = `Loading ${activeRace.name} tracks…`;
     const manifest = await loadTrackManifest();
     const shareState = readShareState(manifest);
+    if (catalogState.invalidRace) {
+      shareState.warning = [catalogState.invalidRace, shareState.warning].filter(Boolean).join(" ");
+    }
     mode = shareState.mode;
     ui.mode.value = mode;
     defaultSyncLine = copySyncLine(manifest.syncLine);
@@ -1694,7 +1762,7 @@ async function initialize() {
     ui.gpsSpikeCorrection.disabled = false;
   } catch (error) {
     ui.trackCount.textContent = "0";
-    ui.status.textContent = error instanceof Error ? error.message : "Could not load the track manifest.";
+    ui.status.textContent = error instanceof Error ? error.message : "Could not load race data.";
   }
 }
 

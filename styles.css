@@ -88,6 +88,19 @@ h2 {
   line-height: 1.45;
 }
 
+.race-control {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 12px;
+  color: #a9b8ba;
+  font-size: 0.72rem;
+}
+
+.race-control select {
+  width: 100%;
+}
+
 .playback,
 .participants {
   padding: 15px;

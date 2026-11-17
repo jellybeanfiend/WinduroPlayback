@@ -21,6 +21,7 @@ Open [http://localhost:8000](http://localhost:8000). Press `Ctrl+C` in the termi
 - The map leaderboard starts collapsed. It shows fixed completion-time order in **Absolute** mode and live counterclockwise two-center angle ranking in **Relative** mode, including checked participants; use its top-right button to expand or collapse the list.
 - Expand **Advanced settings** to pin names, show full routes, hold position through detected GPS dropouts, or draw and adjust the relative-time sync line.
 - Select participants in the list to show or hide their tracks. Use **Show all details** to view gear, start and finish times, and timing information for every participant.
+- Choose a race from the **Race** selector. Race-specific links use the `race` query parameter; changing races resets playback and other race-specific URL settings.
 
 ## Track timing
 
@@ -28,11 +29,11 @@ Tracks with timestamps use their recorded times. For tracks without point timest
 
 Completion times are calculated once from the manifest's default sync line: from its synced start to the first later crossing at least 30 minutes afterward. If no qualifying crossing exists, the track end is used. Moving the playback sync line does not change participant times.
 
-The event manifest is `tracks/tracks.json`; it contains participant details, gear, timing estimates, track colors, and the default sync line. Set `color` and optional `secondaryColor` to six-digit hex values; secondary colors appear in participant swatches and marker outlines, while routes stay in the primary color. **Timing for untimed tracks is estimated.**
+The race catalog is `races.json`. Each entry has a unique lowercase `id`, a display `name`, and a `manifest` path. Each race manifest contains participant details, gear, timing estimates, track colors, and its default sync line. GPX filenames are relative to that manifest and must be in the same directory. The existing race uses `tracks/tracks.json`; add future races in separate directories, for example `races/<race-id>/race.json` with that race's GPX files beside it. Set `color` and optional `secondaryColor` to six-digit hex values; secondary colors appear in participant swatches and marker outlines, while routes stay in the primary color. **Timing for untimed tracks is estimated.**
 
 ## Contributing track data
 
-Before opening a PR, run `python scripts/validate_tracks.py`. GitHub Actions runs the same check for every PR. Each participant needs a unique primary `color`; `secondaryColor` is optional. The check also validates manifest fields, timing metadata, GPX coordinates, and timestamps.
+Before opening a PR, run `python scripts/validate_tracks.py`. GitHub Actions runs the same check for every PR. The validator checks the race catalog, every race manifest, and each referenced GPX file. Participant names and primary colors must be unique within a race; `secondaryColor` is optional.
 
 For a timestamped track that needs a manual crossing at the default sync gate, set top-level `startTime` to the intended ISO 8601 timestamp. The override is ignored for non-default gates, where crossings are recalculated from the GPX route. For tracks without point timestamps, put estimated timing in a `timing` object with `start` and `durationSeconds`.
 

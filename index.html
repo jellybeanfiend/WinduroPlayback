@@ -34,7 +34,7 @@
             <p id="leaderboard-empty" class="leaderboard-empty" hidden>No visible participants.</p>
           </div>
         </aside>
-        <div id="status" class="status" role="status" aria-live="polite">Loading race tracks…</div>
+        <div id="status" class="status" role="status" aria-live="polite">Loading races…</div>
       </section>
 
       <aside class="controls">
@@ -42,6 +42,10 @@
           <p class="eyebrow">WINDURO</p>
           <h1>Race playback</h1>
           <p class="subheading">Explore participant tracks together on the course.</p>
+          <label class="race-control" for="race-select">
+            <span>Race</span>
+            <select id="race-select" disabled aria-label="Select race"></select>
+          </label>
         </header>
 
         <section class="playback" aria-labelledby="playback-heading">
