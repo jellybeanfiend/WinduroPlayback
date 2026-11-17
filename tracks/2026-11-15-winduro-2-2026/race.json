@@ -1,0 +1,28 @@
+{
+  "syncLine": {
+    "start": [
+      47.565535,
+      -122.192076
+    ],
+    "end": [
+      47.565553,
+      -122.196534
+    ]
+  },
+  "tracks": [
+    {
+      "name": "Sevena S",
+      "file": "sevena_winduro2.gpx",
+      "discipline": "Windsurf",
+      "color": "#59d5ff",
+      "gear": "Windsurfer LT"
+    },
+    {
+      "name": "Thomas M",
+      "file": "thomas_winduro2.gpx",
+      "discipline": "Windfoil",
+      "color": "#ffcb5b",
+      "gear": "Fanatic Beeeee"
+    }
+  ]
+}

@@ -5,6 +5,12 @@
       "name": "Winduro 2026",
       "date": "2026-11-08",
       "manifest": "./tracks/winduro-2026/race.json"
+    },
+    {
+      "id": "2026-11-15-winduro-2-2026",
+      "name": "Winduro 2 2026",
+      "date": "2026-11-15",
+      "manifest": "./tracks/2026-11-15-winduro-2-2026/race.json"
     }
   ]
 }
